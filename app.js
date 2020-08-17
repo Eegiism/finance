@@ -10,10 +10,18 @@ var uiController =  (function(){
 		tusuvLabel: ".budget__value",
 		incomeLabel: ".budget__income--value",
 		expenseLabel: ".budget__expenses--value",
-		percentageLabel: ".budget__expenses--percentage"
+		percentageLabel: ".budget__expenses--percentage",
+		containerDiv: ".container",
+		dateLabel: ".budget__title--month"
 	}
 
 	return {
+
+		displayDate: function() {
+			var unuudur = new Date();
+			document.querySelector(DomStrings.dateLabel).textContent = unuudur.getFullYear() + " оны " + unuudur.getMonth() + " сар ";
+		},
+
 		getInput: function(){
 			return{
 				type: document.querySelector(DomStrings.inputType).value,
@@ -41,23 +49,29 @@ var uiController =  (function(){
 			fieldsArr[0].focus();
 		},
 
-		tusuvUzuuleh: function(tusuv){
+		tusuvUzuuleh: function(tusuv) {
 			document.querySelector(DomStrings.tusuvLabel).textContent = tusuv.tusuv;
 			document.querySelector(DomStrings.incomeLabel).textContent = tusuv.totalInc;
 			document.querySelector(DomStrings.expenseLabel).textContent = tusuv.totalExp;
 			document.querySelector(DomStrings.percentageLabel).textContent = tusuv.huvi + "%";
 		},
 
-		addListItem: function(item, type){
+		deleteListItem: function(id) {
+			var el = document.getElementById(id);
+			console.log("id ---> " + el);
+			el.parentNode.removeChild(el);
+		},
+
+		addListItem: function(item, type) {
 
 			var html, listType;
 
 			if(type === 'inc'){
 				listType = DomStrings.incomeList;
-				html = '<div class="item clearfix" id="$ID$"><div class="item__description">$DESCTIPTION$</div><div class="right clearfix"><div class="item__value">$AMOUNT$</div><div class="item__delete"><button class="item__delete--btn"><i class="ion-ios-close-outline"></i></button></div></div></div>'
+				html = '<div class="item clearfix" id="inc-$ID$"><div class="item__description">$DESCTIPTION$</div><div class="right clearfix"><div class="item__value">$AMOUNT$</div><div class="item__delete"><button class="item__delete--btn"><i class="ion-ios-close-outline"></i></button></div></div></div>'
 			} else {
 				listType = DomStrings.expenseList; 
-				html = '<div class="item clearfix" id="$ID$"><div class="item__description">$DESCTIPTION$</div><div class="right clearfix"><div class="item__value">$AMOUNT$</div><div class="item__percentage">21%</div><div class="item__delete"><button class="item__delete--btn"><i class="ion-ios-close-outline"></i></button></div></div></div>'
+				html = '<div class="item clearfix" id="exp-$ID$"><div class="item__description">$DESCTIPTION$</div><div class="right clearfix"><div class="item__value">$AMOUNT$</div><div class="item__percentage">21%</div><div class="item__delete"><button class="item__delete--btn"><i class="ion-ios-close-outline"></i></button></div></div></div>'
 			}
 
 			html = html.replace('$ID$', item.id);		
@@ -76,13 +90,24 @@ var financeController =  (function(){
 		this.id = id,
 		this.description = description,
 		this.amount = amount
-	}
+	};
 
 	var Expense = function(id, description, amount){
 		this.id = id,
 		this.description = description,
-		this.amount = amount
-	}
+		this.amount = amount,
+		this.percentage = -1
+	};
+
+	Expense.prototype.calcPercentage = function(totalIncome) {
+		if(totalIncome > 0) 
+			this.percentage = Math.round((this.amount / totalIncome) * 100);
+		else this.percentage = 0;
+	};
+
+	Expense.prototype.getPercentage = function() {
+		return this.percentage;
+	};
 
 	var calculateTotal = function(type) {
 		var sum = 0;
@@ -91,7 +116,7 @@ var financeController =  (function(){
 		}) 
 
 		data.totals[type] = sum;
-	}
+	};
 
   // private data
 	var data = {
@@ -128,6 +153,18 @@ var financeController =  (function(){
 			}
 		},
 		
+		deleteItem: function(type, id) {
+			var ids = data.items[type].map(function(el) {
+				return el.id;
+			});
+
+			var index = ids.indexOf(id);
+
+			if(index !== -1) {
+				data.items[type].slice(index, 1);
+			}
+
+		},
 		
 
 		addItem: function(type, desc, amount){	
@@ -172,16 +209,21 @@ var appController =  (function(uiController,financeController){
 			uiController.addListItem(item, input.type);
 			uiController.clearFields();
 	
-			// 4 Төсвийг тооцоолно
-			financeController.tusuvTootsooloh();
+			updateTusuv();
 	
-			// 5 Эцсийн үлдэгдэл авах 
-			var tusuv = financeController.tusuvAvah();
-
-		   // 6 тооцоог дэлгэцэнд гаргана
-		   uiController.tusuvUzuuleh(tusuv);
 		}
-	}
+	};
+
+	var updateTusuv = function() {
+		// 4 Төсвийг тооцоолно
+		financeController.tusuvTootsooloh();
+	
+		// 5 Эцсийн үлдэгдэл авах 
+		var tusuv = financeController.tusuvAvah();
+
+	   // 6 тооцоог дэлгэцэнд гаргана
+	   uiController.tusuvUzuuleh(tusuv);
+	};
 
 	var setUpEventListeners = function(){
 		var DOM = uiController.getDomStrings();
@@ -196,10 +238,25 @@ var appController =  (function(uiController,financeController){
 				ctrlAddItem();
 			}
 		});
-	}
+
+		document.querySelector(DOM.containerDiv).addEventListener('click', function(event) {
+			var id = event.target.parentNode.parentNode.parentNode.parentNode.id;
+			if(id) {
+				var arr = id.split("-");
+				var type = arr[0];
+				var itemId = parseInt(arr[1]);
+
+				financeController.deleteItem(type, itemId);
+				console.log("original ID ----> " + id);
+				uiController.deleteListItem(id);
+				updateTusuv();
+			}
+		});
+	};
 
 	return {
 		init: function() {
+			uiController.displayDate();
 			uiController.tusuvUzuuleh( {
 				tusuv: 0,
 				huvi: 0,
